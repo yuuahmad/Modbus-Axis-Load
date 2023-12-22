@@ -13,42 +13,60 @@ fitur
 -komunikasi menggunakan modbus sehingga minim kabel
 -program lebih efsien sehingga minim resources dan pembacaan lebih cepat
 -data yang dikumpulkan terkumpul lebih banyak daripada program sebelumnya
-
 */
+
 #include <Arduino.h>
 #include <RTClib.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <SD.h>
+#include <SoftwareSerial.h>
+#include <ModbusMaster.h>
 
-RTC_DS3231 rtc; // nama variabel untuk mengeksekusi program2 ke rtc
+// variabel rtc
+RTC_DS3231 rtc; // nama variabel utama rtc
 
+// variabel sd
 const int chipSelectSD = 10; // pin ss microsd module
-File myFile;                 // nama variabel untuk mengeksekusi program2 ke microsd
+File myFile;                 // nama variabel utama microsd
+
+// variabel modbus
+// #define DE 2
+#define RE 2                 // Pin receive enable max485. #re dan de satu pin
+#define ModbusBaudrate 19200 // Baudrate Komunikasi Modbus
 
 // global variabel
-int nilaiTambah = 0;
+int nilaiTambah = 0;        // nilai untuk testing awal
+#define SerialBaudrate 9600 // Baudrate Komunikasi Serial
+#define ID_MX 1             // Modbus ID Axis Driver X
+#define ID_MY 2             // Modbus ID Axis Driver Y
+#define ID_MZ 3             // Modbus ID Axis Driver Z
+#define ID_MI 4             // Modbus ID Spindle Inverter
 
-void simpanData(DateTime waktu)
+// fungsi untuk menyimpan data yg dikumpulkan ke microsd
+void simpanData(DateTime waktu, File perintahFile)
 {
-    if (myFile)
+    if (perintahFile)
     {
-        myFile.print(String("DateTime::TIMESTAMP_FULL:\t") + waktu.timestamp(DateTime::TIMESTAMP_FULL));
+        Serial.print("tulis data ke load.csv...");
+        myFile.print(waktu.timestamp(DateTime::TIMESTAMP_DATE));
+        myFile.print(",");
+        myFile.print(waktu.timestamp(DateTime::TIMESTAMP_TIME));
         myFile.print(",");
         myFile.println(nilaiTambah);
+        myFile.close();
         Serial.println("berhasil tulis data");
     }
     else
-    {
-        Serial.println("Error tulis data !");
-    }
+        Serial.println("error tulis data ke load.csv");
 }
 
 void setup()
 {
-    Serial.begin(9600);
-    // set tanggal menjadi sekarang! kalau sudah di set, jangan lupa dikomen agar tidak ke set lagi
-    // rtc.adjust(DateTime(2023, 12, 22, 13, 2, 0));
+    Serial.begin(SerialBaudrate);
+    // set tanggal menjadi sekarang! kalau sudah di set
+    // jangan lupa dikomen agar tidak ke set lagi
+    rtc.adjust(DateTime(2023, 12, 22, 21, 16, 0));
 
     // ----------- RTC --------------------------------
     // cek apakah rtc terpasang benar atau tidak
@@ -56,42 +74,44 @@ void setup()
         while (1)
             ;
 
-    // ketika mcu kehilangan daya, buat mcu mengingat waktu terakhir dengan perintah seperti ini
+    // ketika mcu kehilangan daya, buat mcu mengingat waktu terakhir
     if (rtc.lostPower())
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
     // ----------- SD card -----------------------------
     // cek apakah sd card terpasang benar atau tidak
     if (!SD.begin(chipSelectSD))
+    {
+        Serial.println("inisialisasi SD gagal!");
         return;
+    }
+    Serial.println("inisialisasi SD berhasil");
 
-    // cek apakah ada file bernama datalogger_loadmotor.csv
-    // if (SD.exists("datalogger_loadmotor.csv"))
+    // cek apakah ada file bernama load.csv
     // jika ada, buka file tersebut
-    myFile = SD.open("datalogger_loadmotor.csv", FILE_WRITE);
-
-    // tulis nama variabel disetiap awal mulai melogger data
+    myFile = SD.open("load.csv", FILE_WRITE);
     if (myFile)
     {
-        myFile.print("timestamp");
+        // tulis nama variabel disetiap awal mulai melogger data
+        Serial.print("tulis data ke load.csv...");
+        myFile.print("timestamp Date");
         myFile.print(",");
-        myFile.print("nilai-ke");
+        myFile.print("timestamp Time");
+        myFile.print(",");
+        myFile.println("nilai-ke");
+        myFile.close();
+        Serial.println("berhasil tulis data");
     }
+    else
+        Serial.println("error tulis data ke load.csv");
 }
 
 void loop()
 {
     DateTime waktuSekarang = rtc.now();
 
-    // tulis semua data yang telah terkumpul di file
-    // if (myFile)
-    // {
-    //   myFile.print(String("DateTime::TIMESTAMP_FULL:\t") + waktuSekarang.timestamp(DateTime::TIMESTAMP_FULL));
-    //   myFile.print(",");
-    //   myFile.println(nilaiTambah);
-    // }
-
-    simpanData(waktuSekarang);
+    myFile = SD.open("load.csv", FILE_WRITE);
+    simpanData(waktuSekarang, myFile);
 
     nilaiTambah++;
     delay(1000);
