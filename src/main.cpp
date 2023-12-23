@@ -4,11 +4,20 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <RTClib.h>
-// #include <SD.h>
+#include <SD.h>
 
 // ---------- GLOBAL VARIABLES --------------------------------
 int torsiMotorX = 0;
 int nilaiTambah = 0;
+int dataArray[] = {0, 0, 0, 0, 0, 0, 0, 0}; // nilai load x,y,z
+unsigned long previousMillis = 0;           // will store last time LED was updated
+// constants won't change:
+const long interval = 3000; // interval at which to blink (milliseconds)
+int adressMotor[3] = {
+    1,
+    5,
+    6,
+};
 
 // ---------- MODBUS ------------------------------------------
 #define MAX485_DE 3
@@ -23,8 +32,8 @@ LiquidCrystal_I2C lcd(0x27, 16, 2); // Object lcd for class Liquidcrystal with L
 RTC_DS3231 rtc;
 
 // ---------- SD ----------------------------------------------
-// File myFile;
-// const int chipSelect = 10;
+File myFile;
+const int chipSelect = 10;
 
 // ---------- FUNGSI ------------------------------------------
 // Function for setting stste of Pins DE & RE of RS-485
@@ -63,6 +72,34 @@ void postTransmission()
 //   }
 // }
 
+// initialize?, load motor x, load motor y, load motor z
+void SDwrite(int initial, int X, int Y, int Z)
+{
+  myFile.close();
+  myFile = SD.open("yuu.txt", FILE_WRITE);
+
+  if (myFile)
+  {
+    if (initial == 1)
+    {
+      myFile.print("load X");
+      myFile.print(",");
+      myFile.print("load Y");
+      myFile.print(",");
+      myFile.println("load Z");
+    }
+    else
+    {
+      myFile.print(X);
+      myFile.print(",");
+      myFile.print(Y);
+      myFile.print(",");
+      myFile.println(Z);
+    }
+  }
+  myFile.close();
+}
+
 // -------------- VOID SETUP() -------------------------
 void setup()
 {
@@ -96,12 +133,12 @@ void setup()
 
   //------ setup SD
   // cek apakah sd card terpasang benar atau tidak
-  // if (!SD.begin(chipSelect))
-  // {
-  //   lcd.setCursor(0, 0);
-  //   lcd.println("err init sd       ");
-  //   return;
-  // }
+  if (!SD.begin(chipSelect))
+  {
+    // lcd.setCursor(0, 0);
+    // lcd.println("err init sd       ");
+    return;
+  }
   // lcd.setCursor(0, 0);
   // lcd.println("fin init sd       ");
 
@@ -122,14 +159,17 @@ void setup()
   //   myFile.close();
   //   lcd.print("done write init    ");
   //   delay(500);
-// }
-// else lcd.print("err tulis data   ");
-// delay(2000);
-// }
+  // }
+  // else lcd.print("err tulis data   ");
+  // delay(2000);
+  // }
+
+  // buat data awal untuk index
+  SDwrite(1, 0, 0, 0);
 }
 void loop()
 {
-  DateTime waktuSekarang = rtc.now();
+  // DateTime waktuSekarang = rtc.now();
 
   // cara menulis data ke slave dari master (arduino nano)
   // float value = analogRead(A0);
@@ -139,27 +179,51 @@ void loop()
   // lcd.print(value);
   // lcd.print(time.timestamp(DateTime::TIMESTAMP_DATE));
 
-  // cara membaca data dari slave
-  uint8_t hasilUtama;
-  hasilUtama = node.readHoldingRegisters(452, 1); // baca pada adress 452 saja
-  if (hasilUtama == node.ku8MBSuccess)
+  // cara membaca data dari 3 buah slave
+  for (int i = 4; i <= 6; i++)
   {
-    torsiMotorX = node.getResponseBuffer(0);
-    lcd.setCursor(0, 1);
-    lcd.print(torsiMotorX);
+    node.begin(i, Serial);
+    uint8_t hasilUtama;
+    hasilUtama = node.readHoldingRegisters(452, 1); // baca pada adress 452 saja
+    if (hasilUtama == node.ku8MBSuccess)
+    {
+      dataArray[i] = node.getResponseBuffer(0);
+    }
+    else
+    {
+      dataArray[i] = 101;
+    }
+  }
+
+  // tampilkan data load motor di lcd
+  lcd.setCursor(0, 0); // Pindah ke baris 1
+  lcd.print("XYZ ");
+  for (int i = 4; i <= 6; i++)
+  {
+    lcd.print(dataArray[i]);
     lcd.print(" ");
-    lcd.print(waktuSekarang.timestamp(DateTime::TIMESTAMP_TIME));
-    lcd.print("       ");
+    // delay(50); // Tunggu 2 detik sebelum menampilkan data berikutnya
   }
-  else
-  {
-    lcd.setCursor(0, 1);
-    lcd.print(";");
-    // lcd.print(time.timestamp(DateTime::TIMESTAMP_TIME));
-    lcd.print("       ");
-  }
+  lcd.print("                 ");
+
   // nilaiTambah++;
   // myFile = SD.open("load.csv", FILE_WRITE);
   // simpanData(waktuSekarang, myFile);
-  // delay(200);
+
+  // tampilkan waktu sekarang
+  // lcd.setCursor(0, 1);
+  // lcd.print(";");
+  // lcd.print(waktuSekarang.timestamp(DateTime::TIMESTAMP_TIME));
+
+  // unsigned long currentMillis = millis();
+
+  // // akan tulis ke micro sd setiap satu detik sekali
+  // if (currentMillis - previousMillis >= interval)
+  // {
+  //   // save the last time you blinked the LED
+  //   previousMillis = currentMillis;
+  //   SDwrite(0, dataArray[1], dataArray[2], dataArray[3]);
+  // }
+
+  delay(200);
 }

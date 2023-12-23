@@ -178,19 +178,19 @@ void dp_trq(int a, int b)
   int c = readModbusFloat(a, b);
 }
 
-// void loop() {
-//   // put your main code here, to run repeatedly:
-//   int z = readModbusFloat(1,452);
-//   com.print(z);
-//   com.print("   ");
-//   z = abs(z);
-//   delay(1000);
-//   z=z/10;
-//   com.println(z);
-//   // SDwriteraw(String(z));
-//   // SDwrite(String(z));
-//   delay(1000);
-// }
+void loop() {
+  // put your main code here, to run repeatedly:
+  int z = readModbusFloat(1,452);
+  com.print(z);
+  com.print("   ");
+  z = abs(z);
+  delay(1000);
+  z=z/10;
+  com.println(z);
+  SDwriteraw(String(z));
+  SDwrite(String(z));
+  delay(1000);
+}
 
 void loop()
 {
