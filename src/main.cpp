@@ -1,43 +1,34 @@
-/* program data logger load motor
-revisi oleh yuuahmad
-
-komponen yang digunakan
--arduino nano
--modul rtc DS3231
--module microsd
--module modbus max485
-
-fitur
--adanya module rtc sehingga waktu data terekan dapat diketahui
--data yang direkam masuk dengan format csv. sehingga dapat diproses dengan python / excell
--komunikasi menggunakan modbus sehingga minim kabel
--program lebih efsien sehingga minim resources dan pembacaan lebih cepat
--data yang dikumpulkan terkumpul lebih banyak daripada program sebelumnya
-*/
-
 #include <Arduino.h>
-#include <RTClib.h>
+#include <ModbusMaster.h> //Library for using ModbusMaster
+#include <LiquidCrystal_I2C.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <SD.h>
-#include <SoftwareSerial.h>
-#include <ModbusMaster.h>
-#include <LiquidCrystal_I2C.h>
+#include <RTClib.h>
+// #include <SD.h>
 
-// ---------------- global variabel ----------------
-int nilaiTambah = 0;
+// ---------- GLOBAL VARIABLES --------------------------------
 int torsiMotorX = 0;
-int torsiMotorY = 0;
-int torsiMotorZ = 0;
+int nilaiTambah = 0;
 
-// ---------------- variabel dan fungsi lcd ------------------
-LiquidCrystal_I2C lcd(0x27, 16, 2); // object node lcd.
-
-// ---------------- variabel dan fungsi modbus ------------------
+// ---------- MODBUS ------------------------------------------
 #define MAX485_DE 3
 #define MAX485_RE_NEG 2
-ModbusMaster node;     // object node for class ModbusMaster
-void preTransmission() // Function for setting stste of Pins DE & RE of RS-485
+#define M_PARITY SERIAL_8E1
+ModbusMaster node; // object node for class ModbusMaster
+
+// ---------- LCD ----------------------------------------------
+LiquidCrystal_I2C lcd(0x27, 16, 2); // Object lcd for class Liquidcrystal with LCD pins (RS, E, D4, D5, D6, D7) that are connected with Arduino UNO.
+
+// ---------- RTC ----------------------------------------------
+RTC_DS3231 rtc;
+
+// ---------- SD ----------------------------------------------
+// File myFile;
+// const int chipSelect = 10;
+
+// ---------- FUNGSI ------------------------------------------
+// Function for setting stste of Pins DE & RE of RS-485
+void preTransmission()
 {
   digitalWrite(MAX485_RE_NEG, 1);
   digitalWrite(MAX485_DE, 1);
@@ -47,183 +38,128 @@ void postTransmission()
   digitalWrite(MAX485_RE_NEG, 0);
   digitalWrite(MAX485_DE, 0);
 }
-
-// ---------------- variabel dan fungsi rtc -----
-RTC_DS3231 rtc; // nama variabel utama rtc
-
-// ---------------- variabel dan fungsi sd ----------------
-const int chipSelectSD = 10; // pin ss microsd module
-File myFile;                 // nama variabel utama microsd
-
 // fungsi untuk menyimpan data yg dikumpulkan ke microsd
-void simpanData(DateTime waktu, int torsiMotorX, File perintahFile)
-{
-  if (perintahFile)
-  {
-    // Serial.print("tulis data ke load.csv...");
-    myFile.print(waktu.timestamp(DateTime::TIMESTAMP_DATE));
-    myFile.print(",");
-    myFile.print(waktu.timestamp(DateTime::TIMESTAMP_TIME));
-    myFile.print(",");
-    myFile.print(torsiMotorX);
-    // myFile.print(",");
-    // myFile.print(torsiMotorY);
-    // myFile.print(",");
-    // myFile.print(torsiMotorZ);
-    myFile.print(",");
-    myFile.println(nilaiTambah);
-    myFile.close();
-    // Serial.println("berhasil tulis data");
-  }
-  // else
-  // Serial.println("error tulis data ke load.csv");
-}
+// void simpanData(DateTime waktu, File perintahFile)
+// {
+//   if (perintahFile)
+//   {
+//     lcd.setCursor(0, 1);
+//     lcd.print("write           ");
+//     delay(200);
+//     myFile.print(waktu.timestamp(DateTime::TIMESTAMP_DATE));
+//     myFile.print(",");
+//     myFile.print(waktu.timestamp(DateTime::TIMESTAMP_TIME));
+//     myFile.print(",");
+//     myFile.println(nilaiTambah);
+//     myFile.close();
+//     lcd.print("done :3           ");
+//     delay(200);
+//   }
+//   else
+//   {
+//     lcd.setCursor(0, 1);
+//     lcd.print("err :(           ");
+//     delay(200);
+//   }
+// }
 
+// -------------- VOID SETUP() -------------------------
 void setup()
 {
-  // ---------------- lcd ----------------
-  lcd.init();
-  lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print("init lcd       ");
-  delay(1000);
-
-  // ---------------- modbus ----------------
+  //------ setup MODBUS
+  Serial.begin(19200, M_PARITY); // Baud Rate as 19200
+  node.begin(1, Serial);         // Slave ID as 1
   pinMode(MAX485_RE_NEG, OUTPUT);
   pinMode(MAX485_DE, OUTPUT);
   digitalWrite(MAX485_RE_NEG, 0);
   digitalWrite(MAX485_DE, 0);
-  Serial.begin(115200);  // Baud Rate 115200 untuk modbus
-  node.begin(1, Serial); // Slave ID 1 sebagai default
-
-  // Callback for configuring RS-485 Transreceiver correctly
-  node.preTransmission(preTransmission);
+  node.preTransmission(preTransmission); // Callback for configuring RS-485 Transreceiver correctly
   node.postTransmission(postTransmission);
 
-  lcd.setCursor(0, 0);
-  lcd.print("init modbus    ");
-  delay(1000);
-
-  // ----------- RTC --------------------------------
-  // cek apakah rtc terpasang benar atau tidak
-  lcd.setCursor(0, 0);
-  lcd.print("init rtc       ");
-  delay(5000);
+  //------ setup RTC
   if (!rtc.begin())
   {
-    lcd.setCursor(0, 0);
-    lcd.print("rtc fail       ");
-    delay(1000);
     while (1)
       ;
   }
-  else
-  {
-    lcd.setCursor(0, 0);
-    lcd.print("init rtc sucses");
-  }
+  // upload pertama, lalu komen agar data waktu tersimpan di rtc
+  // jangan lepas rtc dari arduino nano
+  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
-  // ketika mcu kehilangan daya, buat mcu mengingat waktu terakhir
-  if (rtc.lostPower())
-  {
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    lcd.setCursor(0, 0);
-    lcd.print("set rtc time   ");
-    delay(1000);
-  }
-
-  // ---------------- SD card ----------------
-  // cek apakah sd card terpasang benar atau tidak
+  //------ setup LCD
+  lcd.init();
+  lcd.backlight();
   lcd.setCursor(0, 0);
-  lcd.print("init sd        ");
-  delay(1000);
-  if (!SD.begin(chipSelectSD))
-  {
-    // Serial.println("inisialisasi SD gagal!");
-    lcd.setCursor(0, 0);
-    lcd.print("sd fail!!      ");
-    delay(1000);
-    while (1)
-      ; // ketika fail, jamgan lanjutkan program
-  }
-  else
-  {
-    lcd.setCursor(0, 0);
-    lcd.print("init sd sucsess ");
-    delay(1000);
-  }
+  lcd.print("Yuuahmad");
+  delay(500);
+  lcd.clear();
 
-  // Serial.println("inisialisasi SD berhasil");
+  //------ setup SD
+  // cek apakah sd card terpasang benar atau tidak
+  // if (!SD.begin(chipSelect))
+  // {
+  //   lcd.setCursor(0, 0);
+  //   lcd.println("err init sd       ");
+  //   return;
+  // }
+  // lcd.setCursor(0, 0);
+  // lcd.println("fin init sd       ");
 
   // cek apakah ada file bernama load.csv
   // jika ada, buka file tersebut
-  myFile = SD.open("load.csv", FILE_WRITE);
-  if (myFile)
-  {
-    // tulis nama variabel disetiap awal mulai melogger data
-    // Serial.print("tulis data ke load.csv...");
-    lcd.setCursor(0, 0);
-    lcd.print("tulis data init ");
-    myFile.print("timestamp Date");
-    myFile.print(",");
-    myFile.print("timestamp Time");
-    myFile.print(",");
-    myFile.print("load motor x");
-    myFile.print(",");
-    myFile.println("nilai-ke");
-    myFile.close(); // tak perlu di close karena hanya tulis di satu file saja
-    // Serial.println("berhasil tulis data");
-    lcd.setCursor(0, 0);
-    lcd.print("done tulis     ");
-    delay(1000);
-  }
-  else
-  {
-    lcd.setCursor(0, 0);
-    lcd.print("fail tulis     ");
-    delay(1000);
-    while (1)
-      ; // gagal tulis data awal? berhentikan program
-  }
-
-  lcd.setCursor(0, 0);
-  lcd.print("done all init   ");
-  delay(1000);
+  // myFile = SD.open("load.csv", FILE_WRITE);
+  // if (myFile)
+  // {
+  //   // tulis nama variabel disetiap awal mulai melogger data
+  //   lcd.setCursor(0, 0);
+  //   lcd.print("write init data    ");
+  //   delay(500);
+  //   myFile.print("timestamp Date");
+  //   myFile.print(",");
+  //   myFile.print("timestamp Time");
+  //   myFile.print(",");
+  //   myFile.println("nilai-ke");
+  //   myFile.close();
+  //   lcd.print("done write init    ");
+  //   delay(500);
+// }
+// else lcd.print("err tulis data   ");
+// delay(2000);
+// }
 }
 void loop()
 {
   DateTime waktuSekarang = rtc.now();
 
+  // cara menulis data ke slave dari master (arduino nano)
   // float value = analogRead(A0);
-  // node.writeSingleRegister(0x40000, value); // Writes value to 0x40000 holding register
-  lcd.setCursor(0, 0);
-  lcd.print("Val: ");
+  // node.writeSingleRegister(0x40000, value);
+  // lcd.setCursor(0, 0);
+  // lcd.print(":");
   // lcd.print(value);
-  lcd.print("             ");
+  // lcd.print(time.timestamp(DateTime::TIMESTAMP_DATE));
 
-  // fungsi membaca nilai torsi motor
-  // ini adalah cara membaca data modbus
+  // cara membaca data dari slave
   uint8_t hasilUtama;
-  // float hasilBacaTorsiMotor;
-  // node.begin(1, Serial);
-  hasilUtama = node.readInputRegisters(0x30002, 1); // baca pada adress 3002 saja
+  hasilUtama = node.readHoldingRegisters(452, 1); // baca pada adress 452 saja
   if (hasilUtama == node.ku8MBSuccess)
   {
-    torsiMotorX = node.getResponseBuffer(0x00);
+    torsiMotorX = node.getResponseBuffer(0);
     lcd.setCursor(0, 1);
     lcd.print(torsiMotorX);
+    lcd.print(" ");
+    lcd.print(waktuSekarang.timestamp(DateTime::TIMESTAMP_TIME));
+    lcd.print("       ");
   }
   else
   {
     lcd.setCursor(0, 1);
     lcd.print(";");
+    // lcd.print(time.timestamp(DateTime::TIMESTAMP_TIME));
+    lcd.print("       ");
   }
-
-  // buka file bernama load.csv dan simpan nilai kesana
-  myFile = SD.open("load.csv", FILE_WRITE);
-  simpanData(waktuSekarang, torsiMotorX, myFile);
-
-  nilaiTambah++;
-  delay(5000);
-  // Serial.println(nilaiTambah);
+  // nilaiTambah++;
+  // myFile = SD.open("load.csv", FILE_WRITE);
+  // simpanData(waktuSekarang, myFile);
+  // delay(200);
 }
