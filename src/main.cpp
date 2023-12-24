@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <ModbusMaster.h> //Library for using ModbusMaster
-// #include <LiquidCrystal_I2C.h>
+// #include <LiquidCrystal_I2C.h> //jangan gunakan lcd i2c karena data akan korup
 #include <SPI.h>
 #include <Wire.h>
 #include <RTClib.h>
@@ -9,10 +9,9 @@
 // ---------- GLOBAL VARIABLES --------------------------------
 int torsiMotorX = 0;
 int nilaiTambah = 0;
-int dataArray[] = {0, 0, 0, 0, 0, 0, 0, 0, 0}; // nilai load x,y,z
-unsigned long previousMillis = 0;              // will store last time LED was updated
-// constants won't change:
-const long interval = 3000; // interval at which to blink (milliseconds)
+int dataArray[] = {0, 0, 0, 0};   // nilai load x,y,z
+unsigned long previousMillis = 0; // will store last time micro sd was updated
+const long interval = 3000;       // interval penulisan ke microsd (milliseconds)
 int adressMotor[3] = {
     1,
     5,
@@ -47,31 +46,6 @@ void postTransmission()
   digitalWrite(MAX485_RE_NEG, 0);
   digitalWrite(MAX485_DE, 0);
 }
-// fungsi untuk menyimpan data yg dikumpulkan ke microsd
-// void simpanData(DateTime waktu, File perintahFile)
-// {
-//   if (perintahFile)
-//   {
-//     lcd.setCursor(0, 1);
-//     lcd.print("write           ");
-//     delay(200);
-//     myFile.print(waktu.timestamp(DateTime::TIMESTAMP_DATE));
-//     myFile.print(",");
-//     myFile.print(waktu.timestamp(DateTime::TIMESTAMP_TIME));
-//     myFile.print(",");
-//     myFile.println(nilaiTambah);
-//     myFile.close();
-//     lcd.print("done :3           ");
-//     delay(200);
-//   }
-//   else
-//   {
-//     lcd.setCursor(0, 1);
-//     lcd.print("err :(           ");
-//     delay(200);
-//   }
-// }
-
 // initialize?, load motor x, load motor y, load motor z
 void SDwrite(int initial, int X, int Y, int Z)
 {
@@ -141,36 +115,13 @@ void setup()
   }
   // lcd.setCursor(0, 0);
   // lcd.println("fin init sd       ");
-
-  // cek apakah ada file bernama load.csv
-  // jika ada, buka file tersebut
-  // myFile = SD.open("load.csv", FILE_WRITE);
-  // if (myFile)
-  // {
-  //   // tulis nama variabel disetiap awal mulai melogger data
-  //   lcd.setCursor(0, 0);
-  //   lcd.print("write init data    ");
-  //   delay(500);
-  //   myFile.print("timestamp Date");
-  //   myFile.print(",");
-  //   myFile.print("timestamp Time");
-  //   myFile.print(",");
-  //   myFile.println("nilai-ke");
-  //   myFile.close();
-  //   lcd.print("done write init    ");
-  //   delay(500);
-  // }
-  // else lcd.print("err tulis data   ");
-  // delay(2000);
-  // }
-
-  // buat data awal untuk index
+  // buat data awal untuk keterangan
   SDwrite(1, 0, 0, 0);
 }
 void loop()
 {
   unsigned long currentMillis = millis();
-  DateTime waktuSekarang = rtc.now();
+  DateTime waktuSekarang = rtc.now(); // walaupun ada, tapi tidak dipakai
 
   // cara menulis data ke slave dari master (arduino nano)
   // float value = analogRead(A0);
@@ -181,20 +132,16 @@ void loop()
   // lcd.print(time.timestamp(DateTime::TIMESTAMP_DATE));
 
   // cara membaca data dari 3 buah slave
-  for (int i = 4; i <= 8; i = i + 2)
+  for (int i = 1; i <= 3; i = i++)
   {
     node.begin(i, Serial);
     delay(500); // berikan ruang kepada serial untuk ganti adress
     uint8_t hasilUtama;
     hasilUtama = node.readHoldingRegisters(452, 1); // baca pada adress 452 saja
     if (hasilUtama == node.ku8MBSuccess)
-    {
       dataArray[i] = node.getResponseBuffer(0);
-    }
     else
-    {
       dataArray[i] = 101;
-    }
   }
 
   // tampilkan data load motor di lcd
@@ -208,22 +155,15 @@ void loop()
   // }
   // lcd.print("                 ");
 
-  // nilaiTambah++;
-  // myFile = SD.open("load.csv", FILE_WRITE);
-  // simpanData(waktuSekarang, myFile);
-
   // tampilkan waktu sekarang
   // lcd.setCursor(0, 1);
   // lcd.print(";");
   // lcd.print(waktuSekarang.timestamp(DateTime::TIMESTAMP_TIME));
 
-  // akan tulis ke micro sd setiap satu detik sekali
+  // akan tulis ke micro sd setiap x interval milidetik sekali
   if (currentMillis - previousMillis >= interval)
   {
-    // save the last time you blinked the LED
-    previousMillis = currentMillis;
-    SDwrite(0, dataArray[4], dataArray[6], dataArray[8]);
+    previousMillis = currentMillis;                       // save the last time you blinked the LED
+    SDwrite(0, dataArray[1], dataArray[2], dataArray[3]); // tulis data ke M.sd
   }
-
-  // delay(200);
 }
