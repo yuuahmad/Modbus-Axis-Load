@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <ModbusMaster.h> //Library for using ModbusMaster
-#include <LiquidCrystal_I2C.h>
+// #include <LiquidCrystal_I2C.h>
 #include <SPI.h>
 #include <Wire.h>
 #include <RTClib.h>
@@ -9,8 +9,8 @@
 // ---------- GLOBAL VARIABLES --------------------------------
 int torsiMotorX = 0;
 int nilaiTambah = 0;
-int dataArray[] = {0, 0, 0, 0, 0, 0, 0, 0}; // nilai load x,y,z
-unsigned long previousMillis = 0;           // will store last time LED was updated
+int dataArray[] = {0, 0, 0, 0, 0, 0, 0, 0, 0}; // nilai load x,y,z
+unsigned long previousMillis = 0;              // will store last time LED was updated
 // constants won't change:
 const long interval = 3000; // interval at which to blink (milliseconds)
 int adressMotor[3] = {
@@ -26,7 +26,7 @@ int adressMotor[3] = {
 ModbusMaster node; // object node for class ModbusMaster
 
 // ---------- LCD ----------------------------------------------
-LiquidCrystal_I2C lcd(0x27, 16, 2); // Object lcd for class Liquidcrystal with LCD pins (RS, E, D4, D5, D6, D7) that are connected with Arduino UNO.
+// LiquidCrystal_I2C lcd(0x27, 16, 2); // Object lcd for class Liquidcrystal with LCD pins (RS, E, D4, D5, D6, D7) that are connected with Arduino UNO.
 
 // ---------- RTC ----------------------------------------------
 RTC_DS3231 rtc;
@@ -124,12 +124,12 @@ void setup()
   // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
   //------ setup LCD
-  lcd.init();
-  lcd.backlight();
-  lcd.setCursor(0, 0);
-  lcd.print("Yuuahmad");
-  delay(500);
-  lcd.clear();
+  // lcd.init();
+  // lcd.backlight();
+  // lcd.setCursor(0, 0);
+  // lcd.print("Yuuahmad");
+  // delay(500);
+  // lcd.clear();
 
   //------ setup SD
   // cek apakah sd card terpasang benar atau tidak
@@ -169,7 +169,8 @@ void setup()
 }
 void loop()
 {
-  // DateTime waktuSekarang = rtc.now();
+  unsigned long currentMillis = millis();
+  DateTime waktuSekarang = rtc.now();
 
   // cara menulis data ke slave dari master (arduino nano)
   // float value = analogRead(A0);
@@ -180,9 +181,10 @@ void loop()
   // lcd.print(time.timestamp(DateTime::TIMESTAMP_DATE));
 
   // cara membaca data dari 3 buah slave
-  for (int i = 4; i <= 6; i++)
+  for (int i = 4; i <= 8; i = i + 2)
   {
     node.begin(i, Serial);
+    delay(500); // berikan ruang kepada serial untuk ganti adress
     uint8_t hasilUtama;
     hasilUtama = node.readHoldingRegisters(452, 1); // baca pada adress 452 saja
     if (hasilUtama == node.ku8MBSuccess)
@@ -196,15 +198,15 @@ void loop()
   }
 
   // tampilkan data load motor di lcd
-  lcd.setCursor(0, 0); // Pindah ke baris 1
-  lcd.print("XYZ ");
-  for (int i = 4; i <= 6; i++)
-  {
-    lcd.print(dataArray[i]);
-    lcd.print(" ");
-    // delay(50); // Tunggu 2 detik sebelum menampilkan data berikutnya
-  }
-  lcd.print("                 ");
+  // lcd.setCursor(0, 0); // Pindah ke baris 1
+  // lcd.print("XYZ ");
+  // for (int i = 4; i <= 8; i = i + 2)
+  // {
+  //   lcd.print(dataArray[i]);
+  //   lcd.print(" ");
+  //   // delay(50); // Tunggu 2 detik sebelum menampilkan data berikutnya
+  // }
+  // lcd.print("                 ");
 
   // nilaiTambah++;
   // myFile = SD.open("load.csv", FILE_WRITE);
@@ -215,15 +217,13 @@ void loop()
   // lcd.print(";");
   // lcd.print(waktuSekarang.timestamp(DateTime::TIMESTAMP_TIME));
 
-  // unsigned long currentMillis = millis();
+  // akan tulis ke micro sd setiap satu detik sekali
+  if (currentMillis - previousMillis >= interval)
+  {
+    // save the last time you blinked the LED
+    previousMillis = currentMillis;
+    SDwrite(0, dataArray[4], dataArray[6], dataArray[8]);
+  }
 
-  // // akan tulis ke micro sd setiap satu detik sekali
-  // if (currentMillis - previousMillis >= interval)
-  // {
-  //   // save the last time you blinked the LED
-  //   previousMillis = currentMillis;
-  //   SDwrite(0, dataArray[1], dataArray[2], dataArray[3]);
-  // }
-
-  delay(200);
+  // delay(200);
 }
