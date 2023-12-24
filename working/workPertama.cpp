@@ -53,7 +53,6 @@ void SDwrite(int initial, int X, int Y, int Z)
     myFile = SD.open("yuu.txt", FILE_WRITE);
 
     if (myFile)
-    {
         if (initial == 1)
         {
             myFile.print("load X");
@@ -70,7 +69,7 @@ void SDwrite(int initial, int X, int Y, int Z)
             myFile.print(",");
             myFile.println(Z);
         }
-    }
+
     myFile.close();
 }
 
@@ -111,7 +110,8 @@ void setup()
     {
         // lcd.setCursor(0, 0);
         // lcd.println("err init sd       ");
-        return;
+        while (1)
+            ;
     }
     // lcd.setCursor(0, 0);
     // lcd.println("fin init sd       ");

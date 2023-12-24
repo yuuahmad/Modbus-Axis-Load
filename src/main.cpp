@@ -11,7 +11,7 @@ int torsiMotorX = 0;
 int nilaiTambah = 0;
 int dataArray[] = {0, 0, 0, 0};   // nilai load x,y,z
 unsigned long previousMillis = 0; // will store last time micro sd was updated
-const long interval = 3000;       // interval penulisan ke microsd (milliseconds)
+const long interval = 1500;       // interval penulisan ke microsd (milliseconds)
 int adressMotor[3] = {
     1,
     5,
@@ -47,20 +47,23 @@ void postTransmission()
   digitalWrite(MAX485_DE, 0);
 }
 // initialize?, load motor x, load motor y, load motor z
-void SDwrite(int initial, int X, int Y, int Z)
+void SDwrite(int initial, int X, int Y, int Z, DateTime wakturtc)
 {
   myFile.close();
-  myFile = SD.open("yuu.txt", FILE_WRITE);
+  myFile = SD.open("yuumei.txt", FILE_WRITE);
 
   if (myFile)
-  {
     if (initial == 1)
     {
       myFile.print("load X");
       myFile.print(",");
       myFile.print("load Y");
       myFile.print(",");
-      myFile.println("load Z");
+      myFile.print("load Z");
+      myFile.print(",");
+      myFile.print("tanggal");
+      myFile.print(",");
+      myFile.println("waktu");
     }
     else
     {
@@ -68,9 +71,13 @@ void SDwrite(int initial, int X, int Y, int Z)
       myFile.print(",");
       myFile.print(Y);
       myFile.print(",");
-      myFile.println(Z);
+      myFile.print(Z);
+      myFile.print(",");
+      myFile.print(wakturtc.timestamp(DateTime::TIMESTAMP_DATE));
+      myFile.print(",");
+      myFile.println(wakturtc.timestamp(DateTime::TIMESTAMP_TIME));
     }
-  }
+
   myFile.close();
 }
 
@@ -111,12 +118,14 @@ void setup()
   {
     // lcd.setCursor(0, 0);
     // lcd.println("err init sd       ");
-    return;
+    while (1)
+      ;
   }
   // lcd.setCursor(0, 0);
   // lcd.println("fin init sd       ");
   // buat data awal untuk keterangan
-  SDwrite(1, 0, 0, 0);
+  DateTime waktuSekarang = rtc.now(); // walaupun ada, tapi tidak dipakai
+  SDwrite(1, 0, 0, 0, waktuSekarang);
 }
 void loop()
 {
@@ -132,7 +141,7 @@ void loop()
   // lcd.print(time.timestamp(DateTime::TIMESTAMP_DATE));
 
   // cara membaca data dari 3 buah slave
-  for (int i = 1; i <= 3; i = i++)
+  for (int i = 1; i <= 3; i++)
   {
     node.begin(i, Serial);
     delay(500); // berikan ruang kepada serial untuk ganti adress
@@ -163,7 +172,7 @@ void loop()
   // akan tulis ke micro sd setiap x interval milidetik sekali
   if (currentMillis - previousMillis >= interval)
   {
-    previousMillis = currentMillis;                       // save the last time you blinked the LED
-    SDwrite(0, dataArray[1], dataArray[2], dataArray[3]); // tulis data ke M.sd
+    previousMillis = currentMillis;                                      // save the last time you blinked the LED
+    SDwrite(0, dataArray[1], dataArray[2], dataArray[3], waktuSekarang); // tulis data ke M.sd
   }
 }

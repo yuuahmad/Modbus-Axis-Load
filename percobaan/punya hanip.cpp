@@ -25,9 +25,7 @@ void setup()
   Serial.begin(9600);
 
   for (int i = 0; i < numSamples; i++)
-  {
     samples[i] = 0;
-  }
   Serial.print("Initializing SD card...");
 
   if (!SD.begin(10))
@@ -52,10 +50,7 @@ void setup()
     Serial.println("done.");
   }
   else
-  {
-    // if the file didn't open, print an error:
     Serial.println("error opening Currentlog.txt");
-  }
 }
 
 void loop()
@@ -68,9 +63,8 @@ void loop()
 
   int total = 0;
   for (int i = 0; i < numSamples; i++)
-  {
     total += samples[i];
-  }
+
   float average = (float)total / numSamples;
   average = average / 33.5;
 
@@ -79,20 +73,13 @@ void loop()
     float lowerRange = i * 0.25;
     float upperRange = (i + 1) * 0.25;
     if (average >= lowerRange && average < upperRange)
-    {
       if (startTimes[i] == 0)
-      {
         startTimes[i] = millis();
-      }
-    }
-    else
-    {
-      if (startTimes[i] != 0)
+      else if (startTimes[i] != 0)
       {
         durations[i] += millis() - startTimes[i];
         startTimes[i] = 0;
       }
-    }
   }
   unsigned long currentMillis = millis();
 
@@ -101,12 +88,9 @@ void loop()
   {
     // save the last time you blinked the LED
     previousMillis = currentMillis;
-
     for (int i = 0; i < numRanges; i++)
     {
-
       myFile = SD.open("Current.txt", FILE_WRITE);
-
       if (myFile)
       {
         myFile.print("Range ");
@@ -114,29 +98,20 @@ void loop()
         myFile.print(": ");
         myFile.print(durations[i] / 1000.0, 2); // Convert milliseconds to seconds
         myFile.println(" s");
+        myFile.print("Average: ");
+        myFile.println(average, 2);
         myFile.close();
       }
       else
-      {
-        // if the file didn't open, print an error:
         Serial.println("error opening Current.txt");
-      }
 
       Serial.print("Range ");
       Serial.print(i + 1);
       Serial.print(": ");
       Serial.print(durations[i] / 1000.0, 2); // Convert milliseconds to seconds
       Serial.println(" s");
+      Serial.print("Average: ");
+      Serial.println(average, 2); // Print average with 2 decimal places
     }
-    myFile = SD.open("Current.txt", FILE_WRITE);
-
-    if (myFile)
-    {
-      myFile.print("Average: ");
-      myFile.println(average, 2);
-      myFile.close();
-    } // Print average with 2 decimal places
-    Serial.print("Average: ");
-    Serial.println(average, 2); // Print average with 2 decimal places
   }
 }
